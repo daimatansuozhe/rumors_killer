@@ -1,5 +1,5 @@
 {
-  "name": "使用通义试一下",
-  "description": "A smart rumor diagnosis platform powered by SiliconFlow Qwen/QwQ-32B, featuring logical verification and visual propagation analysis.",
+  "name": "TruthSeeker AI",
+  "description": "A smart rumor diagnosis platform powered by DeepSeek-V3, featuring logical verification and visual propagation analysis.",
   "requestFramePermissions": []
 }

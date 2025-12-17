@@ -115,7 +115,7 @@ const App: React.FC = () => {
 
       <footer className="bg-white border-t border-slate-200 py-6 mt-auto">
         <div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
-          <p>© 2024 TruthSeeker AI. Powered by SiliconFlow Qwen/QwQ-32B.</p>
+          <p>© 2024 TruthSeeker AI. Powered by SiliconFlow DeepSeek-V3.</p>
         </div>
       </footer>
     </div>
