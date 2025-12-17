@@ -1,57 +1,82 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, NewsItem } from '../types';
 
-// Initialize Gemini API Client
-// The API key is obtained exclusively from process.env.API_KEY as per guidelines.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Directly use the provided API Key to avoid any build-time injection issues
+const API_KEY = "sk-mkduhzolnutgyagkhuvivocucmzrjgczzkmjwfgziwvgygtw";
+const BASE_URL = 'https://api.siliconflow.cn/v1/chat/completions';
+const MODEL = 'deepseek-ai/DeepSeek-V3.1-Terminus'; 
+
+const FALLBACK_IMAGES = [
+  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1557318041-1ce374d55ebf?w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?w=800&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1526304640152-d4619684e884?w=800&auto=format&fit=crop'
+];
+
+/**
+ * Helper function to call DeepSeek API via SiliconFlow
+ */
+async function fetchDeepSeek(messages: any[]) {
+  if (!API_KEY) throw new Error("API Key is missing");
+
+  // Log partial key for debugging (visible in console)
+  console.log("DeepSeek Request with Key:", API_KEY.slice(0, 8) + "...");
+
+  const response = await fetch(BASE_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: messages,
+      response_format: { type: 'json_object' }, 
+      temperature: 0.7,
+      max_tokens: 2048,
+    })
+  });
+
+  if (!response.ok) {
+     const errorText = await response.text();
+     console.error("DeepSeek API Response Error:", response.status, errorText);
+     throw new Error(`DeepSeek API Error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || '{}';
+}
 
 export const fetchRealtimeNews = async (): Promise<NewsItem[]> => {
-  // Updated prompt to specifically target the user's requested platforms
-  const prompt = `Generate 5 representative examples of recent internet rumors or debunked news from major Chinese platforms: "China Internet Joint Rumor Debunking Platform" (piyao.org.cn), "Toutiao" (Today's Headlines), and "Weibo".
+  const systemPrompt = `You are a news aggregator for a rumor debunking platform.
+  Generate 5 representative examples of recent internet rumors or debunked news in Simplified Chinese from: "China Internet Joint Rumor Debunking Platform" (source name: 中国互联网联合辟谣平台), "Toutiao" (source name: 今日头条), and "Weibo" (source name: 微博).
   
-  Requirements:
-  1. Content should be relevant to current social hot topics, health, or safety in China.
-  2. Source field must be one of: '中国互联网联合辟谣平台', '今日头条', '微博'.
-  3. Include a mix of 'debunked' (rumors) and 'verified' (official truths).
-  4. JSON format only.
-  `;
-
-  const responseSchema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        title: { type: Type.STRING },
-        source: { type: Type.STRING },
-        status: { type: Type.STRING, enum: ['verified', 'debunked', 'uncertain'] },
-        timestamp: { type: Type.STRING },
-      },
-      required: ['title', 'source', 'status', 'timestamp'],
-      propertyOrdering: ['title', 'source', 'status', 'timestamp'],
-    },
-  };
+  Return a strictly valid JSON object with a key "items" containing an array.
+  Each item in the array must have:
+  - title (string): The headline in Chinese.
+  - source (string): Must be exactly one of '中国互联网联合辟谣平台', '今日头条', '微博'.
+  - status (string): 'verified' (for truths/official news) or 'debunked' (for rumors).
+  - timestamp (string): e.g., "10分钟前", "1小时前".
+  
+  Ensure the content is relevant to social topics, health, or safety in China.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: responseSchema,
-      }
-    });
+    const jsonStr = await fetchDeepSeek([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: 'Generate the news list now.' }
+    ]);
+    
+    let parsed;
+    try {
+        parsed = JSON.parse(jsonStr);
+    } catch (e) {
+        console.error("JSON Parse Error", e);
+        return [];
+    }
 
-    const data = JSON.parse(response.text || '[]');
+    const data = parsed.items || parsed; 
+
     if (!Array.isArray(data)) return [];
-
-    // Fallback images - Updated to stable Unsplash IDs
-    const FALLBACK_IMAGES = [
-       'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop', // News/Newspaper
-       'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&auto=format&fit=crop', // Newspapers stack
-       'https://images.unsplash.com/photo-1557318041-1ce374d55ebf?w=800&auto=format&fit=crop', // Tech/Abstract
-       'https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?w=800&auto=format&fit=crop', // Broadcast
-       'https://images.unsplash.com/photo-1526304640152-d4619684e884?w=800&auto=format&fit=crop'  // Abstract
-    ];
 
     return data.map((item: any, index: number) => {
         let searchUrl = '';
@@ -62,13 +87,11 @@ export const fetchRealtimeNews = async (): Promise<NewsItem[]> => {
         } else if (source.includes('头条')) {
             searchUrl = `https://so.toutiao.com/search?keyword=${encodeURIComponent(item.title)}`;
         } else {
-            // For China Internet Joint Rumor Debunking Platform, link to their specific search page as requested
-            // Note: The encoding ensures special characters in the title don't break the URL
             searchUrl = `https://www.piyao.org.cn/pysjk/frontsql.htm?kw=${encodeURIComponent(item.title)}`;
         }
 
         return {
-            id: `gemini-${Date.now()}-${index}`,
+            id: `deepseek-${Date.now()}-${index}`,
             title: item.title,
             source: source,
             status: item.status === 'verified' ? 'verified' : 'debunked',
@@ -85,87 +108,65 @@ export const fetchRealtimeNews = async (): Promise<NewsItem[]> => {
 };
 
 export const checkRumor = async (query: string): Promise<AnalysisResult> => {
-  const prompt = `Analyze the following information for rumors: "${query}".`;
-  
-  const responseSchema = {
-    type: Type.OBJECT,
-    properties: {
-      message: { 
-        type: Type.STRING, 
-        description: "A detailed diagnosis report in Markdown format, analyzing credibility with logic." 
-      },
-      isRumor: { type: Type.BOOLEAN },
-      graphData: {
-         type: Type.OBJECT,
-         properties: {
-           nodes: { 
-             type: Type.ARRAY, 
-             items: {
-               type: Type.OBJECT,
-               properties: {
-                 id: { type: Type.STRING },
-                 label: { type: Type.STRING },
-                 group: { type: Type.INTEGER, description: "1=Source/Rumor, 2=Spreader/Media, 3=Debunk/Official" },
-                 time: { type: Type.STRING }
-               },
-               required: ["id", "label", "group"],
-               propertyOrdering: ["id", "label", "group", "time"]
-             } 
-           },
-           links: { 
-             type: Type.ARRAY,
-             items: {
-               type: Type.OBJECT,
-               properties: {
-                 source: { type: Type.STRING },
-                 target: { type: Type.STRING },
-                 value: { type: Type.NUMBER }
-               },
-               required: ["source", "target", "value"],
-               propertyOrdering: ["source", "target", "value"]
-             }
-           }
-         },
-         required: ["nodes", "links"],
-         propertyOrdering: ["nodes", "links"]
-      }
-    },
-    required: ["message", "isRumor", "graphData"],
-    propertyOrdering: ["message", "isRumor", "graphData"]
-  };
+   const systemPrompt = `You are a professional rumor checking expert. Analyze the credibility of the user's query with logic and evidence.
+   
+   IMPORTANT: The 'message' field MUST be in Simplified Chinese.
+   
+   Return a strictly valid JSON object with the following structure:
+   {
+     "message": "A detailed diagnosis report in Simplified Chinese (Markdown format). Use bolding and clear structure.",
+     "isRumor": boolean,
+     "graphData": {
+       "nodes": [
+         { "id": "1", "label": "Origin Name", "group": 1, "time": "Date" }
+       ],
+       "links": [
+         { "source": "1", "target": "2", "value": 1 }
+       ]
+     }
+   }
+   
+   Graph Data Rules:
+   - Generate a logical propagation path or relationship graph based on the event analysis.
+   - group 1: Source/Rumor Origin (Color: Red)
+   - group 2: Spreader/Media/Key Node (Color: Orange)
+   - group 3: Debunk/Official/Truth (Color: Blue)
+   - Ensure 'source' and 'target' in links match the 'id' in nodes.
+   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: responseSchema,
-        systemInstruction: "You are a rumor checking expert. Analyze the credibility with logic.",
-      }
-    });
+   try {
+     const jsonStr = await fetchDeepSeek([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Analyze this information: "${query}"` }
+     ]);
 
-    const result = JSON.parse(response.text || '{}');
+     let result;
+     try {
+         result = JSON.parse(jsonStr);
+     } catch (e) {
+         console.error("JSON Parse Error", e);
+         throw new Error("AI returned invalid JSON.");
+     }
 
-    // Safety check for null graphData
-    if (!result.graphData) {
+     if (!result.graphData) {
         result.graphData = { nodes: [], links: [] };
-    }
+     }
 
-    return result as AnalysisResult;
+     return result as AnalysisResult;
 
-  } catch (error: any) {
+   } catch (error: any) {
     console.error("Analysis Error:", error);
     let errorMsg = "分析过程中出现错误，请稍后重试。";
     
-    if (error.message?.includes("API key")) {
-        errorMsg = "认证失败：API Key 无效。请检查配置。";
+    // Pass through exact API error if available
+    if (error.message?.includes("API Error")) {
+        errorMsg = `API 请求失败: ${error.message}`;
     }
 
     return {
-        message: errorMsg,
+        message: `${errorMsg}`,
         isRumor: false,
         graphData: null
     };
-  }
+   }
 };
