@@ -8,8 +8,7 @@ export const MOCK_NEWS: NewsItem[] = [
     status: 'debunked',
     timestamp: '10分钟前',
     imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?w=800&auto=format&fit=crop',
-    // Using internal search of the platform to ensure result relevance and no 404
-    url: 'http://so.piyao.org.cn/search/search?page=1&channelid=274971&searchword=社保卡'
+    url: 'https://www.piyao.org.cn/pysjk/frontsql.htm?kw=%E7%BD%91%E4%BC%A0%E2%80%9C%E4%BA%BA%E7%A4%BE%E4%BF%9D%E5%8D%A1%E5%BF%85%E9%A1%BB%E5%9C%A8%E8%A7%84%E5%AE%9A%E6%97%B6%E9%97%B4%E5%86%85%E6%8D%A2%E5%8F%91%E2%80%9D%E7%B3%BB%E8%B0%A3%E8%A8%80'
   },
   {
     id: '2',
@@ -36,7 +35,7 @@ export const MOCK_NEWS: NewsItem[] = [
     status: 'debunked',
     timestamp: '2小时前',
     imageUrl: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=800&auto=format&fit=crop',
-    url: 'http://so.piyao.org.cn/search/search?page=1&channelid=274971&searchword=纯净水+钙流失'
+    url: 'https://www.piyao.org.cn/pysjk/frontsql.htm?kw=%E8%B0%A3%E8%A8%80%EF%BC%9A%E9%95%BF%E6%9C%9F%E5%96%9D%E7%BA%AF%E5%87%80%E6%B0%B4%E4%BC%9A%E5%AF%BC%E8%87%B4%E9%92%99%E6%B5%81%E5%A4%B1'
   },
   {
     id: '5',

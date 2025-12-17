@@ -6,7 +6,15 @@ import { AnalysisResult, NewsItem } from '../types';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const fetchRealtimeNews = async (): Promise<NewsItem[]> => {
-  const prompt = `Generate 5 representative examples of common or recent internet rumors or hot news in China.`;
+  // Updated prompt to specifically target the user's requested platforms
+  const prompt = `Generate 5 representative examples of recent internet rumors or debunked news from major Chinese platforms: "China Internet Joint Rumor Debunking Platform" (piyao.org.cn), "Toutiao" (Today's Headlines), and "Weibo".
+  
+  Requirements:
+  1. Content should be relevant to current social hot topics, health, or safety in China.
+  2. Source field must be one of: '中国互联网联合辟谣平台', '今日头条', '微博'.
+  3. Include a mix of 'debunked' (rumors) and 'verified' (official truths).
+  4. JSON format only.
+  `;
 
   const responseSchema = {
     type: Type.ARRAY,
@@ -45,15 +53,30 @@ export const fetchRealtimeNews = async (): Promise<NewsItem[]> => {
        'https://images.unsplash.com/photo-1526304640152-d4619684e884?w=800&auto=format&fit=crop'  // Abstract
     ];
 
-    return data.map((item: any, index: number) => ({
-        id: `gemini-${Date.now()}-${index}`,
-        title: item.title,
-        source: item.source,
-        status: item.status === 'verified' ? 'verified' : 'debunked',
-        timestamp: item.timestamp,
-        url: `https://www.baidu.com/s?wd=${encodeURIComponent(item.title)}`,
-        imageUrl: FALLBACK_IMAGES[index % FALLBACK_IMAGES.length]
-    }));
+    return data.map((item: any, index: number) => {
+        let searchUrl = '';
+        const source = item.source || '中国互联网联合辟谣平台';
+        
+        if (source.includes('微博')) {
+            searchUrl = `https://s.weibo.com/weibo?q=${encodeURIComponent(item.title)}`;
+        } else if (source.includes('头条')) {
+            searchUrl = `https://so.toutiao.com/search?keyword=${encodeURIComponent(item.title)}`;
+        } else {
+            // For China Internet Joint Rumor Debunking Platform, link to their specific search page as requested
+            // Note: The encoding ensures special characters in the title don't break the URL
+            searchUrl = `https://www.piyao.org.cn/pysjk/frontsql.htm?kw=${encodeURIComponent(item.title)}`;
+        }
+
+        return {
+            id: `gemini-${Date.now()}-${index}`,
+            title: item.title,
+            source: source,
+            status: item.status === 'verified' ? 'verified' : 'debunked',
+            timestamp: item.timestamp,
+            url: searchUrl,
+            imageUrl: FALLBACK_IMAGES[index % FALLBACK_IMAGES.length]
+        };
+    });
 
   } catch (error) {
     console.error("Failed to fetch news:", error);

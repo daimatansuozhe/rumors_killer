@@ -53,7 +53,6 @@ const NewsCarousel: React.FC<NewsCarouselProps> = ({ news }) => {
           </span>
           实时辟谣监控 / Real-time Monitor
         </h2>
-        <span className="text-xs text-slate-400">数据来源: 联合辟谣平台 · 今日头条 · 微博</span>
       </div>
       
       <div 
